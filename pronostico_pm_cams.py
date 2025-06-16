@@ -7,14 +7,15 @@ import cdsapi
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.image as image
+from concurrent.futures import ThreadPoolExecutor
 
 # Configuración inicial
 WORKDIR = "/home/arw/scripts/python/cams/temp"
 os.chdir(WORKDIR)
 
-# Eliminar archivos .zip previos
+# Eliminar archivos .zip y .nc previos
 for f in os.listdir(WORKDIR):
-    if f.endswith(".zip"):
+    if f.endswith(".zip") or f.endswith(".nc"):
         os.remove(os.path.join(WORKDIR, f))
 
 # Fecha de ayer
@@ -45,7 +46,7 @@ client.retrieve(
     }
 ).download("data_polvo.zip")
 
-# Descarga de AOD para área extendida
+# Descarga de AOD para el área extendida [-100, 0] x [0, 30]
 client.retrieve(
     "cams-global-atmospheric-composition-forecasts",
     {
@@ -62,7 +63,8 @@ client.retrieve(
 # Descomprimir y renombrar archivos NetCDF
 def descomprimir_y_renombrar(nombre_zip, sufijo):
     with zipfile.ZipFile(nombre_zip, "r") as zip_ref:
-        for name in zip_ref.namelist():
+        file_list = zip_ref.namelist()
+        for name in file_list:
             zip_ref.extract(name, WORKDIR)
             if "plev" in name:
                 os.rename(os.path.join(WORKDIR, name), os.path.join(WORKDIR, f"data_plev_{sufijo}.nc"))
@@ -76,29 +78,32 @@ descomprimir_y_renombrar("data_aod.zip", "aod")
 ds_sfc = xr.open_dataset("data_sfc_polvo.nc")
 ds_plev = xr.open_dataset("data_plev_polvo.nc")
 ds_sfc_aod = xr.open_dataset("data_sfc_aod.nc")
-
-# Coordenadas y tiempos AOD
 aod = ds_sfc_aod["duaod550"].values.squeeze()
+tiempo_sfc_aod = ds_sfc_aod.forecast_reference_time.values[0] + ds_sfc_aod.forecast_period.values
+tiempo_sfc_aod_str = [np.datetime_as_string(t - np.timedelta64(6, 'h'), unit='m') for t in tiempo_sfc_aod]
 lat_aod = ds_sfc_aod.latitude.values
 lon_aod = ds_sfc_aod.longitude.values
 X_aod, Y_aod = np.meshgrid(lon_aod, lat_aod)
-tiempo_sfc_aod = ds_sfc_aod.forecast_reference_time.values[0] + ds_sfc_aod.forecast_period.values
-tiempo_sfc_aod_str = [np.datetime_as_string(t - np.timedelta64(6, 'h'), unit='m') for t in tiempo_sfc_aod]
 
-# Coordenadas y tiempos principales
 lat = ds_sfc.latitude.values
 lon = ds_sfc.longitude.values
 X, Y = np.meshgrid(lon, lat)
+
+print("Dimensiones ds_sfc:", ds_sfc.dims)
+print("Coordenadas ds_sfc:", ds_sfc.coords)
+print("Dimensiones ds_plev:", ds_plev.dims)
+print("Coordenadas ds_plev:", ds_plev.coords)
+
+# Reconstrucción de los tiempos reales
 tiempo_sfc = ds_sfc.forecast_reference_time.values[0] + ds_sfc.forecast_period.values
 tiempo_plev = ds_plev.forecast_reference_time.values[0] + ds_plev.forecast_period.values
+
 tiempo_sfc_str = [np.datetime_as_string(t - np.timedelta64(6, 'h'), unit='m') for t in tiempo_sfc]
 tiempo_plev_str = [np.datetime_as_string(t - np.timedelta64(6, 'h'), unit='m') for t in tiempo_plev]
 
-# Variables desde data_sfc.nc
+# Variables
 pm10 = ds_sfc.pm10.values.squeeze() * 1e9
 pm25 = ds_sfc.pm2p5.values.squeeze() * 1e9
-
-# Variables desde data_plev.nc
 rho_aire = 1.225
 dust_total = (
     ds_plev["aermr04"].sel(pressure_level=1000).values +
@@ -112,52 +117,82 @@ shp2 = gpd.read_file("/home/arw/shape/GSHHS_h_L1.shp")
 logo = image.imread("/home/arw/scripts/python/cams/logoMarn_color.png")
 icca = image.imread("/home/arw/scripts/python/cams/ICCA.jpeg")
 
-# Función de graficado
-def graficar_variable(variable, tiempos, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                      cmap, niveles, nombre_variable, nombre_archivo_base,
-                      icca=None, niveles_icca=None, categorias=None, usar_icca=False):
-    n_tiempos = min(variable.shape[0], len(tiempos))
-    print(f"🖼️  Generando {n_tiempos} imágenes para: {nombre_variable} -> {nombre_archivo_base}_*.png")
+# Función de graficado por imagen individual
+def graficar_imagen(i, variable, tiempos, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                    cmap, niveles, nombre_variable, nombre_archivo_base,
+                    icca=None, niveles_icca=None, categorias=None, usar_icca=False):
+    aspect_ratio = (max(lon) - min(lon)) / (max(lat) - min(lat))
+    base_width_in = 16
+    dpi = 120
+    height_in = base_width_in / aspect_ratio
 
-    for i in range(n_tiempos):
-        fig, ax = plt.subplots(figsize=(12, 10))
-        if usar_icca:
-            cont = ax.contourf(X, Y, variable[i, :, :], levels=niveles_icca, extend="both", colors=cmap)
-        else:
-            cont = ax.contourf(X, Y, variable[i, :, :], levels=niveles, extend="both", cmap=cmap)
-        cbar = fig.colorbar(cont, fraction=0.04, pad=0.04, shrink=0.70, orientation="horizontal")
-        if usar_icca:
-            cont.set_clim(min(niveles_icca), max(niveles_icca))
-            cbar.set_ticklabels(categorias)
+    fig, ax = plt.subplots(figsize=(base_width_in, height_in), dpi=dpi)
 
-        titulo = (
-            f"{'Calidad del aire - ' + nombre_variable} - {tiempos[i]}\n\n"
-            "Modelo CAMS - Observatorio de Amenazas - MARN"
-        )
-        ax.set_title(titulo, fontsize=10)
-        ax.set_xlabel("Longitud", fontsize=6)
-        ax.set_ylabel("Latitud", fontsize=6)
-        ax.set_xlim(min(lon), max(lon))
-        ax.set_ylim(min(lat), max(lat))
-        ax.grid()
-        plt.tight_layout()
-        shp.plot(ax=ax, color="black", linewidth=0.5)
-        shp2.plot(ax=ax, color="black", linewidth=0.3)
+    if usar_icca:
+        cont = ax.contourf(X, Y, variable[i, :, :], levels=niveles_icca, extend="both", colors=cmap)
+    else:
+        cont = ax.contourf(X, Y, variable[i, :, :], levels=niveles, extend="both", cmap=cmap)
 
-        newax = fig.add_axes([0.78, 0.03, 0.2, 0.2], anchor="SE", zorder=10)
-        newax.imshow(logo)
-        newax.text(75, 450, etiqueta_hora, fontsize=6)
+    cbar = fig.colorbar(cont, orientation="horizontal", pad=0.1, aspect=40)
+    if usar_icca:
+        cont.set_clim(min(niveles_icca), max(niveles_icca))
+        cbar.set_ticklabels(categorias)
+
+    ax.set_title(f"{nombre_variable} - {tiempos[i]}\n\nModelo CAMS - Observatorio de Amenazas - MARN", fontsize=14)
+    ax.set_xlabel("Longitud", fontsize=10)
+    ax.set_ylabel("Latitud", fontsize=10)
+    ax.set_xlim(min(lon), max(lon))
+    ax.set_ylim(min(lat), max(lat))
+    ax.grid()
+    plt.tight_layout()
+
+    shp.plot(ax=ax, edgecolor="black", facecolor="none", linewidth=0.5)
+    shp2.plot(ax=ax, edgecolor="black", facecolor="none", linewidth=0.3)
+
+    # Logo dentro del área graficada
+    logo_width = (max(lon) - min(lon)) * 0.1
+    logo_height = (max(lat) - min(lat)) * 0.1
+    x0 = max(lon) - logo_width
+    x1 = max(lon)
+    y0 = min(lat)
+    y1 = min(lat) + logo_height
+    ax.imshow(logo, extent=[x0, x1, y0, y1], zorder=10)
+
+    if usar_icca and icca is not None:
+        newax2 = fig.add_axes([0.066, 0.12, 0.32, 0.32], anchor="SE")
+        newax2.imshow(icca)
         plt.axis("off")
 
-        if usar_icca and icca is not None:
-            newax2 = fig.add_axes([0.066, 0.12, 0.32, 0.32], anchor="SE")
-            newax2.imshow(icca)
-            plt.axis("off")
+    fig.savefig(f"{nombre_archivo_base}_{i}.png")
+    plt.close()
 
-        fig.savefig(f"{nombre_archivo_base}_{i}.png")
-        plt.close()
+# Llamada paralela
+from functools import partial
 
-# Parámetros de graficado
+def generar_imagenes(variable, tiempos, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                     cmap, niveles, nombre_variable, nombre_archivo_base,
+                     icca=None, niveles_icca=None, categorias=None, usar_icca=False):
+    with ThreadPoolExecutor() as executor:
+        executor.map(
+            partial(
+                graficar_imagen,
+                variable=variable,
+                tiempos=tiempos,
+                X=X, Y=Y,
+                lat=lat, lon=lon,
+                shp=shp, shp2=shp2,
+                logo=logo, etiqueta_hora=etiqueta_hora,
+                cmap=cmap, niveles=niveles,
+                nombre_variable=nombre_variable,
+                nombre_archivo_base=nombre_archivo_base,
+                icca=icca, niveles_icca=niveles_icca,
+                categorias=categorias,
+                usar_icca=usar_icca
+            ),
+            range(min(variable.shape[0], len(tiempos)))
+        )
+
+# Parámetros
 niveles_pm10 = np.arange(0, 200, 1)
 niveles_pm25 = np.arange(0, 100, 1)
 niveles_dust = np.arange(0, 300, 10)
@@ -168,19 +203,20 @@ niveles_pm10_icca = [56, 155, 255, 355, 424, 604]
 niveles_pm25_icca = [15.5, 40.5, 66, 160, 251, 500]
 categorias = ["Buena", "Moderada", "Dañina sensibles", "Dañina salud", "Muy dañina", "Peligroso"]
 
-# Graficado
-graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                  "YlOrBr", niveles_pm10, "PM10 (µg/m³)", "cams_pm10")
-graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                  "YlOrBr", niveles_pm25, "PM2.5 (µg/m³)", "cams_pm25")
-graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                  paleta_icca, niveles_pm10, "PM10 ICCA", "cams_pm10_icca",
-                  icca, niveles_pm10_icca, categorias, usar_icca=True)
-graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                  paleta_icca, niveles_pm25, "PM2.5 ICCA", "cams_pm25_icca",
-                  icca, niveles_pm25_icca, categorias, usar_icca=True)
-graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
-                  "YlOrBr", niveles_dust, "Concentración de polvo (µg/m³)", "cams_dust_total")
-graficar_variable(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod,
-                  shp, shp2, logo, etiqueta_hora,
-                  "YlOrBr", niveles_aod, "AOD polvo 550nm", "cams_aod_dust")
+# Ejecutar
+print("Generando gráficos...")
+generar_imagenes(pm10, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                 "YlOrBr", niveles_pm10, "PM10 (µg/m³)", "cams_pm10")
+generar_imagenes(pm25, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                 "YlOrBr", niveles_pm25, "PM2.5 (µg/m³)", "cams_pm25")
+generar_imagenes(pm10, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                 paleta_icca, niveles_pm10, "PM10 ICCA", "cams_pm10_icca",
+                 icca, niveles_pm10_icca, categorias, usar_icca=True)
+generar_imagenes(pm25, tiempo_sfc_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                 paleta_icca, niveles_pm25, "PM2.5 ICCA", "cams_pm25_icca",
+                 icca, niveles_pm25_icca, categorias, usar_icca=True)
+generar_imagenes(dust_total, tiempo_plev_str, X, Y, lat, lon, shp, shp2, logo, etiqueta_hora,
+                 "YlOrBr", niveles_dust, "Concentración de polvo (µg/m³)", "cams_dust_total")
+generar_imagenes(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod,
+                 shp, shp2, logo, etiqueta_hora,
+                 "YlOrBr", niveles_aod, "AOD polvo 550nm", "cams_aod_dust")
