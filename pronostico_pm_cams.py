@@ -136,8 +136,11 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
         cbar.outline.set_linewidth(0.5)
         if usar_icca and categorias:
             cont.set_clim(min(niveles_icca), max(niveles_icca))
-            cbar.set_ticks(niveles_icca)
+            # Calcular el centro de cada intervalo para poner los ticks ahí
+            ticks_icca = [(niveles_icca[i] + niveles_icca[i+1]) / 2 for i in range(len(niveles_icca)-1)]
+            cbar.set_ticks(ticks_icca)
             cbar.set_ticklabels(categorias)
+
 
         ax.set_title(f"{nombre_variable} - {tiempos[i]}\nModelo CAMS - Observatorio de Amenazas - MARN", fontsize=13, pad=15)
         ax.set_xlabel("Longitud", fontsize=11)
@@ -178,8 +181,8 @@ niveles_dust = np.arange(0, 300, 10)
 niveles_aod = np.arange(0, 1.1, 0.1)
 
 paleta_icca = ["#92d14f", "#ffff01", "#ffc000", "#fe0000", "#7030a0", "#000000"]
-niveles_pm10_icca = [56, 155, 255, 355, 424, 604]
-niveles_pm25_icca = [15.5, 40.5, 66, 160, 251, 500]
+niveles_pm10_icca = [0, 56, 155, 255, 355, 424, 604]
+niveles_pm25_icca = [0, 15.5, 40.5, 66, 160, 251, 500]
 categorias = ["Buena", "Moderada", "Dañina\n sensibles", "Dañina\n salud", "Muy\n dañina", "Peligroso"]
 
 # Ejecutar
