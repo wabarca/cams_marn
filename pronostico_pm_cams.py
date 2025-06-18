@@ -189,11 +189,11 @@ graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "Yl
 graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_pm25,
                   "PM2.5 (µg/m³)", "cams_pm25", shapefiles=[shp1, shp2, shp3])
 
-graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm10,
+graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm10_icca,
                   "PM10 ICCA", "cams_pm10_icca", icca=icca, niveles_icca=niveles_pm10_icca,
                   categorias=categorias, usar_icca=True, shapefiles=[shp1, shp2, shp3])
 
-graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm25,
+graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm25_icca,
                   "PM2.5 ICCA", "cams_pm25_icca", icca=icca, niveles_icca=niveles_pm25_icca,
                   categorias=categorias, usar_icca=True, shapefiles=[shp1, shp2, shp3])
 
