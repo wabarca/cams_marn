@@ -159,7 +159,7 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
 
         # ICCA leyenda en la esquina inferior izquierda
         if usar_icca and icca is not None:
-            icca_height = (max(lat) - min(lat)) * 0.12
+            icca_height = (max(lat) - min(lat)) * 0.4
             icca_width = (icca.shape[1] / icca.shape[0]) * icca_height
             ax.imshow(icca, extent=[min(lon), min(lon)+icca_width, min(lat), min(lat)+icca_height],
                       transform=ccrs.PlateCarree(), zorder=10)
@@ -180,15 +180,9 @@ niveles_aod = np.arange(0, 1.1, 0.1)
 paleta_icca = ["#92d14f", "#ffff01", "#ffc000", "#fe0000", "#7030a0", "#000000"]
 niveles_pm10_icca = [56, 155, 255, 355, 424, 604]
 niveles_pm25_icca = [15.5, 40.5, 66, 160, 251, 500]
-categorias = ["Buena", "Moderada", "Dañina sensibles", "Dañina salud", "Muy dañina", "Peligroso"]
+categorias = ["Buena", "Moderada", "Dañina\n sensibles", "Dañina\n salud", "Muy\n dañina", "Peligroso"]
 
 # Ejecutar
-graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_pm10,
-                  "PM10 (µg/m³)", "cams_pm10", shapefiles=[shp1, shp2, shp3])
-
-graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_pm25,
-                  "PM2.5 (µg/m³)", "cams_pm25", shapefiles=[shp1, shp2, shp3])
-
 graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm10_icca,
                   "PM10 ICCA", "cams_pm10_icca", icca=icca, niveles_icca=niveles_pm10_icca,
                   categorias=categorias, usar_icca=True, shapefiles=[shp1, shp2, shp3])
@@ -196,6 +190,12 @@ graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, pal
 graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm25_icca,
                   "PM2.5 ICCA", "cams_pm25_icca", icca=icca, niveles_icca=niveles_pm25_icca,
                   categorias=categorias, usar_icca=True, shapefiles=[shp1, shp2, shp3])
+
+graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_pm10,
+                  "PM10 (µg/m³)", "cams_pm10", shapefiles=[shp1, shp2, shp3])
+
+graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_pm25,
+                  "PM2.5 (µg/m³)", "cams_pm25", shapefiles=[shp1, shp2, shp3])
 
 graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_dust,
                   "Concentración de polvo (µg/m³)", "cams_dust_total", shapefiles=[shp1, shp2, shp3])
