@@ -117,7 +117,7 @@ icca = image.imread("/home/arw/scripts/python/cams/ICCA.jpeg")
 # Función de graficado con proyección y ajustes visuales
 def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cmap, niveles,
                       nombre_variable, nombre_archivo_base, icca=None, niveles_icca=None,
-                      categorias=None, usar_icca=False, shapefiles=[]):
+                      categorias=None, usar_icca=False, shapefiles=[],shrink_colorbar=0.4):
     aspect_ratio = (max(lon) - min(lon)) / (max(lat) - min(lat))
     width = 12
     height = width / aspect_ratio
@@ -132,7 +132,7 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
                            colors=cmap if usar_icca else None,
                            extend="both", transform=ccrs.PlateCarree())
 
-        cbar = plt.colorbar(cont, ax=ax, orientation='horizontal', pad=0.07, shrink=0.4, extendrect=True)
+        cbar = plt.colorbar(cont, ax=ax, orientation='horizontal', pad=0.08, shrink=shrink_colorbar, extendrect=True)
         cbar.outline.set_linewidth(0.5)
         if usar_icca and categorias:
             cont.set_clim(min(niveles_icca), max(niveles_icca))
@@ -186,6 +186,9 @@ niveles_pm25_icca = [0, 15.5, 40.5, 66, 160, 251, 500]
 categorias = ["Buena", "Moderada", "Dañina\n sensibles", "Dañina\n salud", "Muy\n dañina", "Peligroso"]
 
 # Ejecutar
+graficar_variable(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod, logo, etiqueta_hora, "YlOrBr",
+                  niveles_aod, "AOD polvo 550nm", "cams_aod_dust", shapefiles=[shp1, shp2], shrink_colorbar=0.25)
+
 graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, paleta_icca, niveles_pm10_icca,
                   "PM10 ICCA", "cams_pm10_icca", icca=icca, niveles_icca=niveles_pm10_icca,
                   categorias=categorias, usar_icca=True, shapefiles=[shp1, shp2, shp3])
@@ -202,6 +205,3 @@ graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora, "Yl
 
 graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora, "YlOrBr", niveles_dust,
                   "Concentración de polvo (µg/m³)", "cams_dust_total", shapefiles=[shp1, shp2, shp3])
-
-graficar_variable(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod, logo, etiqueta_hora, "YlOrBr",
-                  niveles_aod, "AOD polvo 550nm", "cams_aod_dust", shapefiles=[shp1, shp2])
