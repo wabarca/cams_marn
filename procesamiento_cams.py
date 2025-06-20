@@ -6,10 +6,13 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.image as image
 import cartopy.crs as ccrs
+from matplotlib.colors import ListedColormap
+import subprocess
 
 # === Directorios ===
 DATA_DIR = "/home/arw/cams/temp/"
 IMG_DIR = "/home/arw/cams/imagery/"
+DESTINO = "arw@192.168.4.20:/var/www/html/salidaschem"
 
 # Crear carpeta y limpiar imágenes anteriores
 os.makedirs(IMG_DIR, exist_ok=True)
@@ -50,6 +53,7 @@ dust_total = (
     ds_plev["aermr05"].sel(pressure_level=1000).values +
     ds_plev["aermr06"].sel(pressure_level=1000).values
 ).squeeze() * rho_aire * 1e9
+dust_total = np.where(dust_total <= 0, np.nan, dust_total)
 
 # === Shapefiles y logos ===
 shp1 = gpd.read_file("/home/arw/shape/GSHHS_h_L1.shp")
@@ -61,7 +65,7 @@ icca = image.imread("/home/arw/scripts/python/cams/ICCA.jpeg")
 # === Parámetros ===
 niveles_pm10 = np.arange(0, 200, 1)
 niveles_pm25 = np.arange(0, 100, 1)
-niveles_dust = np.arange(0, 100, 10)
+niveles_dust = np.arange(5, 100, 5)
 niveles_aod = np.arange(0, 1.1, 0.1)
 
 paleta_icca = ["#92d14f", "#ffff01", "#ffc000", "#fe0000", "#7030a0", "#000000"]
@@ -125,35 +129,65 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
         fig.savefig(f"{nombre_archivo_base}_{i+1}.png", bbox_inches='tight')
         plt.close()
 
+# Función de sincronización de imágenes
+def sincronizar(nombre_base, subcarpeta_destino):
+    ruta_archivos = os.path.join(IMG_DIR, f"{nombre_base}_*.png")
+    destino_completo = f"{DESTINO}/{subcarpeta_destino}/images"
+    print(f"📤 Enviando {nombre_base}_*.png a {subcarpeta_destino}...")
+    resultado = subprocess.run(f"scp {ruta_archivos} {destino_completo}", shell=True)
+    if resultado.returncode == 0:
+        print(f"✅ {nombre_base} sincronizado con éxito.")
+    else:
+        print(f"❌ Error al sincronizar {nombre_base}.")
+
+# === Preparación de paleta de colores personalizada ===
+# Obtener el colormap original
+original_cmap = plt.cm.get_cmap('YlOrBr', 256)
+
+# Convertirlo a una lista de colores
+polvo = original_cmap(np.linspace(0, 1, 256))
+
+# Reemplazar el primer color con blanco
+polvo[0] = [1, 1, 1, 1]  # RGBA para blanco
+
+# Crear un nuevo colormap personalizado
+polvo_colores = ListedColormap(polvo)
+
 # === Ejecuciones de graficado ===
+graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora,
+                  "YlOrBr", niveles_dust, "Concentración de polvo (µg/m³)",
+                  os.path.join(IMG_DIR, "cams_dust_total"),
+                  shapefiles=[shp1, shp2, shp3])
+sincronizar("cams_dust_total", "dust_cams")
+
 graficar_variable(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod, logo, etiqueta_hora,
-                  "YlOrBr", niveles_aod, "AOD polvo 550nm",
+                  polvo_colores, niveles_aod, "AOD polvo 550nm",
                   os.path.join(IMG_DIR, "cams_aod_dust"),
                   shapefiles=[shp1, shp2], shrink_colorbar=0.25)
+sincronizar("cams_aod_dust", "aod_cams")
 
 graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora,
                   paleta_icca, niveles_pm10_icca, "PM10 ICCA",
                   os.path.join(IMG_DIR, "cams_pm10_icca"),
                   icca=icca, niveles_icca=niveles_pm10_icca, categorias=categorias,
                   usar_icca=True, shapefiles=[shp1, shp2, shp3])
+sincronizar("cams_pm10_icca", "pm10_cams_icca")
 
 graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora,
                   paleta_icca, niveles_pm25_icca, "PM2.5 ICCA",
                   os.path.join(IMG_DIR, "cams_pm25_icca"),
                   icca=icca, niveles_icca=niveles_pm25_icca, categorias=categorias,
                   usar_icca=True, shapefiles=[shp1, shp2, shp3])
+sincronizar("cams_pm25_icca", "pm25_cams_icca")
 
 graficar_variable(pm10, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora,
                   "YlOrBr", niveles_pm10, "PM10 (µg/m³)",
                   os.path.join(IMG_DIR, "cams_pm10"),
                   shapefiles=[shp1, shp2, shp3])
+sincronizar("cams_pm10", "pm10_cams")
 
 graficar_variable(pm25, tiempo_sfc_str, X, Y, lat, lon, logo, etiqueta_hora,
                   "YlOrBr", niveles_pm25, "PM2.5 (µg/m³)",
                   os.path.join(IMG_DIR, "cams_pm25"),
                   shapefiles=[shp1, shp2, shp3])
-
-graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora,
-                  "YlOrBr", niveles_dust, "Concentración de polvo (µg/m³)",
-                  os.path.join(IMG_DIR, "cams_dust_total"),
-                  shapefiles=[shp1, shp2, shp3])
+sincronizar("cams_pm25", "pm25_cams")
