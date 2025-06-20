@@ -61,7 +61,7 @@ icca = image.imread("/home/arw/scripts/python/cams/ICCA.jpeg")
 # === Parámetros ===
 niveles_pm10 = np.arange(0, 200, 1)
 niveles_pm25 = np.arange(0, 100, 1)
-niveles_dust = np.arange(0, 300, 10)
+niveles_dust = np.arange(0, 100, 10)
 niveles_aod = np.arange(0, 1.1, 0.1)
 
 paleta_icca = ["#92d14f", "#ffff01", "#ffc000", "#fe0000", "#7030a0", "#000000"]
