@@ -47,7 +47,8 @@ client.retrieve(
     }
 ).download("data_polvo.zip")
 
-# Descarga de AOD para el área extendida [north, west, south, east] = [30, -100, 0, 0]
+# Descarga de AOD para el área extendida (lon[-100,0], lat[0,30])
+# Orden: [north, west, south, east] = [30, -100, 0, 0]
 client.retrieve(
     "cams-global-atmospheric-composition-forecasts",
     {
