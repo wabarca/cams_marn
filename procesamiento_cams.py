@@ -155,13 +155,13 @@ polvo_colores = ListedColormap(polvo)
 
 # === Ejecuciones de graficado ===
 graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora,
-                  "YlOrBr", niveles_dust, "Concentración de polvo (µg/m³)",
+                  polvo_colores, niveles_dust, "Concentración de polvo (µg/m³)",
                   os.path.join(IMG_DIR, "cams_dust_total"),
                   shapefiles=[shp1, shp2, shp3])
 sincronizar("cams_dust_total", "dust_cams")
 
 graficar_variable(aod, tiempo_sfc_aod_str, X_aod, Y_aod, lat_aod, lon_aod, logo, etiqueta_hora,
-                  polvo_colores, niveles_aod, "AOD polvo 550nm",
+                  "YlOrBr", niveles_aod, "AOD polvo 550nm",
                   os.path.join(IMG_DIR, "cams_aod_dust"),
                   shapefiles=[shp1, shp2], shrink_colorbar=0.25)
 sincronizar("cams_aod_dust", "aod_cams")
