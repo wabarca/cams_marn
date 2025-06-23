@@ -14,9 +14,9 @@ for f in os.listdir(WORKDIR):
         os.remove(os.path.join(WORKDIR, f))
 
 # Fecha de ayer
-yesterday = datetime.date.today() - datetime.timedelta(days=1)
+yesterday = datetime.date.today() - datetime.timedelta(days=0)
 fecha_str = yesterday.strftime("%Y-%m-%d")
-print(f"Fecha de ayer: {fecha_str}")
+print(f"Fecha de datos: {fecha_str}")
 etiqueta_hora = f"Hora de creación: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')} Hora local"
 
 # Descarga de PM10, PM2.5 y concentraciones de polvo (área Centroamérica)
