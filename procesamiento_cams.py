@@ -8,6 +8,8 @@ import matplotlib.image as image
 import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap
 import subprocess
+import imageio
+import zipfile
 
 # === Directorios ===
 DATA_DIR = "/home/arw/cams/temp/"
@@ -131,14 +133,48 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
 
 # Función de sincronización de imágenes
 def sincronizar(nombre_base, subcarpeta_destino):
-    ruta_archivos = os.path.join(IMG_DIR, f"{nombre_base}_*.png")
-    destino_completo = f"{DESTINO}/{subcarpeta_destino}/images"
-    print(f"📤 Enviando {nombre_base}_*.png a {subcarpeta_destino}...")
-    resultado = subprocess.run(f"scp {ruta_archivos} {destino_completo}", shell=True)
-    if resultado.returncode == 0:
-        print(f"✅ {nombre_base} sincronizado con éxito.")
-    else:
-        print(f"❌ Error al sincronizar {nombre_base}.")
+    ruta_pngs = os.path.join(IMG_DIR, f"{nombre_base}_*.png")
+    ruta_gif = os.path.join(IMG_DIR, f"{nombre_base}.gif")
+    ruta_zip = os.path.join(IMG_DIR, f"{nombre_base}.zip")
+    destino = f"{DESTINO}/{subcarpeta_destino}/images"
+
+    # Sincronizar imágenes PNG
+    print(f"📤 Enviando imágenes {nombre_base}_*.png a {subcarpeta_destino}...")
+    subprocess.run(f"scp {ruta_pngs} {destino}", shell=True)
+
+    # Crear y sincronizar GIF
+    crear_gif(nombre_base)
+    if os.path.exists(ruta_gif):
+        print(f"📤 Enviando GIF {nombre_base}.gif a {subcarpeta_destino}...")
+        subprocess.run(f"scp {ruta_gif} {destino}", shell=True)
+
+    # Crear ZIP (todas las PNG menos el gif)
+    print(f"🗜️ Creando archivo ZIP: {ruta_zip}")
+    with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for file in sorted(os.listdir(IMG_DIR)):
+            if file.startswith(nombre_base + "_") and file.endswith(".png"):
+                zipf.write(os.path.join(IMG_DIR, file), arcname=file)
+
+    # Sincronizar ZIP
+    if os.path.exists(ruta_zip):
+        print(f"📤 Enviando ZIP {nombre_base}.zip a {subcarpeta_destino}...")
+        subprocess.run(f"scp {ruta_zip} {destino}", shell=True)
+
+# Función para creación de animación GIF
+def crear_gif(nombre_base, duracion=0.5):
+    ruta_imagenes = sorted([
+        os.path.join(IMG_DIR, f) for f in os.listdir(IMG_DIR)
+        if f.startswith(nombre_base + "_") and f.endswith(".png")
+    ])
+    if not ruta_imagenes:
+        print(f"⚠️ No se encontraron imágenes para {nombre_base} para crear GIF.")
+        return
+
+    ruta_gif = os.path.join(IMG_DIR, f"{nombre_base}.gif")
+    print(f"🎞️ Generando GIF: {ruta_gif}")
+    imagenes = [imageio.v3.imread(im) for im in ruta_imagenes]
+    imageio.mimsave(ruta_gif, imagenes, duration=duracion)
+
 
 # === Preparación de paleta de colores personalizada ===
 # Obtener el colormap original
