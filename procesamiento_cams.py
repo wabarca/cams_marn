@@ -185,7 +185,7 @@ def graficar_frame(args):
 
     fig.text(0.5, 0.01, etiqueta_hora, fontsize=7, ha='center')
     plt.tight_layout()
-    fig.savefig(f"{nombre_archivo_base}_{i+1}.png", bbox_inches='tight')
+    fig.savefig(f"{nombre_archivo_base}_{i+1:03}.png", bbox_inches='tight')
     plt.close()
 
 # === Función principal de graficado con paralelización por frame ===
