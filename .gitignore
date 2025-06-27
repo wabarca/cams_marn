@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.old
 .DS_Store
 *.sqlite3
 temp/
