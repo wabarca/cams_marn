@@ -8,7 +8,7 @@ import matplotlib.image as image
 import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap
 import subprocess
-import imageio
+import re
 import zipfile
 from PIL import Image
 from multiprocessing import Pool
@@ -92,9 +92,12 @@ polvo_colores = ListedColormap(polvo)
 
 # === Función para crear animaciones GIF a partir de PNG ===
 def crear_gif(nombre_base, duracion=0.3):
+    # Regex que asegura coincidencia exacta: nombre_base + "_" + número.png
+    patron = re.compile(rf"^{re.escape(nombre_base)}_\d+\.png$")
+
     ruta_imagenes = sorted([
         os.path.join(IMG_DIR, f) for f in os.listdir(IMG_DIR)
-        if f.startswith(nombre_base + "_") and f.endswith(".png")
+        if patron.fullmatch(f)
     ])
     if not ruta_imagenes:
         print(f"⚠️ No se encontraron imágenes para {nombre_base} para crear GIF.")
@@ -114,25 +117,33 @@ def crear_gif(nombre_base, duracion=0.3):
 
 # === Función para sincronizar imágenes y archivos al servidor ===
 def sincronizar(nombre_base, subcarpeta_destino):
-    ruta_pngs = os.path.join(IMG_DIR, f"{nombre_base}_*.png")
+    # Compilar patrón exacto de nombre_base_###.png
+    patron = re.compile(rf"^{re.escape(nombre_base)}_\d+\.png$")
+
     ruta_gif = os.path.join(IMG_DIR, f"{nombre_base}.gif")
     ruta_zip = os.path.join(IMG_DIR, f"{nombre_base}.zip")
     destino = f"{DESTINO}/{subcarpeta_destino}/images"
 
+    # === Enviar PNGs válidos ===
     print(f"📤 Enviando imágenes {nombre_base}_*.png a {subcarpeta_destino}...")
-    subprocess.run(f"scp {ruta_pngs} {destino}", shell=True)
+    for file in sorted(os.listdir(IMG_DIR)):
+        if patron.fullmatch(file):
+            subprocess.run(f"scp {os.path.join(IMG_DIR, file)} {destino}", shell=True)
 
+    # === Crear y enviar GIF ===
     crear_gif(nombre_base)
     if os.path.exists(ruta_gif):
         print(f"📤 Enviando GIF {nombre_base}.gif a {subcarpeta_destino}...")
         subprocess.run(f"scp {ruta_gif} {destino}", shell=True)
 
+    # === Crear ZIP con solo los PNG correctos ===
     print(f"🗜️ Creando archivo ZIP: {ruta_zip}")
     with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for file in sorted(os.listdir(IMG_DIR)):
-            if file.startswith(nombre_base + "_") and file.endswith(".png"):
+            if patron.fullmatch(file):
                 zipf.write(os.path.join(IMG_DIR, file), arcname=file)
 
+    # === Enviar ZIP al servidor ===
     if os.path.exists(ruta_zip):
         print(f"📤 Enviando ZIP {nombre_base}.zip a {subcarpeta_destino}...")
         subprocess.run(f"scp {ruta_zip} {destino}", shell=True)
