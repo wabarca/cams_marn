@@ -204,7 +204,7 @@ def graficar_variable(variable, tiempos, X, Y, lat, lon, logo, etiqueta_hora, cm
 
 # === Ejecuciones de graficado y sincronización ===
 graficar_variable(dust_total, tiempo_plev_str, X, Y, lat, lon, logo, etiqueta_hora,
-                  polvo_colores, niveles_dust, "Concentración de polvo (µg/m³)",
+                  polvo_colores, niveles_dust, "Concentración de polvo a 1000 hPa (µg/m³)",
                   os.path.join(IMG_DIR, "cams_dust_total"),
                   shapefiles=[shp1, shp2, shp3])
 sincronizar("cams_dust_total", "dust_cams")
